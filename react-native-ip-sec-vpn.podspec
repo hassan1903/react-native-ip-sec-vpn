@@ -14,7 +14,7 @@ Pod::Spec.new do |s|
   s.license      = "MIT"
   # optional - use expanded license entry instead:
   # s.license    = { :type => "MIT", :file => "LICENSE" }
-  s.authors      = { "Hasan Kürşat Küçüköztaş" => "sinajavaheri@email.com" }
+  s.authors      = { "Hasan Kürşat Küçüköztaş" => "hkucukoztas@gmail.com" }
   s.platforms    = { :ios => "9.0" }
   s.source       = { :git => "https://github.com/hassan1903/react-native-ip-sec-vpn.git", :tag => "#{s.version}" }
 
