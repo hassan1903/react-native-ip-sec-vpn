@@ -106,14 +106,23 @@ class RNIpSecVpn: RCTEventEmitter {
                 print("VPN Preferences error: 1")
             } else {
                 let p = NEVPNProtocolIKEv2()
-
                 p.username = username as String
                 p.remoteIdentifier = address as String
                 p.serverAddress = address as String
+                p.authenticationMethod = NEVPNIKEAuthenticationMethod.none
+                p.childSecurityAssociationParameters.diffieHellmanGroup = NEVPNIKEv2DiffieHellmanGroup.group20
+                p.childSecurityAssociationParameters.lifetimeMinutes = 1440
+                p.childSecurityAssociationParameters.encryptionAlgorithm = NEVPNIKEv2EncryptionAlgorithm.algorithmAES256GCM
+                p.childSecurityAssociationParameters.integrityAlgorithm = NEVPNIKEv2IntegrityAlgorithm.SHA384
+                p.ikeSecurityAssociationParameters.diffieHellmanGroup = NEVPNIKEv2DiffieHellmanGroup.group20
+                p.ikeSecurityAssociationParameters.lifetimeMinutes = 1440
+                p.ikeSecurityAssociationParameters.encryptionAlgorithm = NEVPNIKEv2EncryptionAlgorithm.algorithmAES256GCM
+                p.ikeSecurityAssociationParameters.integrityAlgorithm = NEVPNIKEv2IntegrityAlgorithm.SHA384
+                p.enablePFS = true
+                p.enableRevocationCheck = true
 
                 kcs.save(key: "password", value: password as String)
                 p.passwordReference = kcs.load(key: "password")
-                p.authenticationMethod = NEVPNIKEAuthenticationMethod.none
 
                 p.useExtendedAuthentication = true
                 p.disconnectOnSleep = false
