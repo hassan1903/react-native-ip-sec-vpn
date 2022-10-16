@@ -175,7 +175,13 @@ class RNIpSecVpn: RCTEventEmitter {
     @objc
     func disconnect(_ findEventsWithResolver: RCTPromiseResolveBlock, rejecter: RCTPromiseRejectBlock) -> Void {
         let vpnManager = NEVPNManager.shared()
-        vpnManager.connection.stopVPNTunnel()
+        vpnManager.loadFromPreferences(completionHandler: { error in
+            if error != nil {
+                print("VPN Disconnect error", error!)
+            } else {
+                vpnManager.connection.stopVPNTunnel()
+            }
+        })
         findEventsWithResolver(nil)
     }
     
