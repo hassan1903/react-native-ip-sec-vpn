@@ -1,9 +1,25 @@
 {
   "name": "react-native-ip-sec-vpn",
-  "title": "React Native Ip Sec Vpn",
   "version": "1.1.1",
   "description": "React Native IPSec VPN Module",
+  "keywords": [
+    "react-native",
+    "ikev",
+    "ipsec",
+    "ipsec vpn",
+    "vpn"
+  ],
   "homepage": "https://github.com/sijav/react-native-ip-sec-vpn#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sijav/react-native-ip-sec-vpn.git",
+    "baseUrl": "https://github.com/sijav/react-native-ip-sec-vpn"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Sijav",
+    "email": "sinajavaheri@gmail.com"
+  },
   "main": "index.js",
   "types": "index.d.ts",
   "files": [
@@ -16,36 +32,20 @@
     "react-native-ip-sec-vpn.podspec"
   ],
   "scripts": {
-    "prepare": "yarn run compile",
-    "compile": "tsc -p tsconfig.json"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/sijav/react-native-ip-sec-vpn.git",
-    "baseUrl": "https://github.com/sijav/react-native-ip-sec-vpn"
-  },
-  "keywords": [
-    "react-native",
-    "ikev",
-    "ipsec",
-    "ipsec vpn",
-    "vpn"
-  ],
-  "author": {
-    "name": "Sijav",
-    "email": "sinajavaheri@gmail.com"
-  },
-  "license": "MIT",
-  "licenseFilename": "LICENSE",
-  "readmeFilename": "README.md",
-  "peerDependencies": {
-    "react": "^18.2.0",
-    "react-native": ">=0.60.0-rc.0 <1.0.x"
+    "compile": "tsc -p tsconfig.json",
+    "prepare": "yarn run compile"
   },
   "devDependencies": {
     "prettier": "3.1.1",
     "react": "18.2.0",
     "react-native": "0.72.7",
     "typescript": "5.3.3"
-  }
+  },
+  "peerDependencies": {
+    "react": "18.2.0",
+    "react-native": ">=0.60.0-rc.0 <1.0.x"
+  },
+  "licenseFilename": "LICENSE",
+  "readmeFilename": "README.md",
+  "title": "React Native Ip Sec Vpn"
 }

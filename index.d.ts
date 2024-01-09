@@ -1,4 +1,5 @@
 import { EmitterSubscription } from "react-native";
+declare module 'react'
 export declare enum VpnState {
     disconnected = 0,
     connecting = 1,

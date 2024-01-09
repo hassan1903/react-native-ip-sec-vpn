@@ -1,25 +1,21 @@
 {
   "compilerOptions": {
-    "allowUnreachableCode": false,
-    "allowUnusedLabels": false,
+    "target": "esnext",
+    "module": "ES6",
+    "outDir": "package",
+    "types": ["react-native", "node"],
     "declaration": true,
-    "forceConsistentCasingInFileNames": true,
-    "lib": ["es2018"],
-    "module": "commonjs",
-    "noEmitOnError": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitReturns": true,
-    "pretty": true,
-    "sourceMap": true,
-    "strict": true,
-    "target": "es2018",
+    "noEmit": true,
+    "emitDeclarationOnly": false,
+    "skipLibCheck": true,
     "jsx": "react-native",
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "outDir": "./",
-    "removeComments": true,
-    "noImplicitAny": true
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "resolveJsonModule": true
   },
-  "include": ["./index.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "package.json"],
+  "include": ["./index.ts"]
 }
