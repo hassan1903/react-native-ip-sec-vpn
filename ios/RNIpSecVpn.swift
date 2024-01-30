@@ -42,7 +42,7 @@ class KeychainService: NSObject {
         keychainQuery[kSecAttrGenericValue as! NSCopying] = keyData
         keychainQuery[kSecAttrAccountValue as! NSCopying] = keyData
         keychainQuery[kSecAttrServiceValue as! NSCopying] = "VPN"
-        keychainQuery[kSecAttrAccessibleValue as! NSCopying] = kSecAttrAccessibleAlwaysThisDeviceOnly
+        keychainQuery[kSecAttrAccessibleValue as! NSCopying] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         keychainQuery[kSecValueData as! NSCopying] = valueData
         // Delete any existing items
         SecItemDelete(keychainQuery as CFDictionary)
@@ -56,7 +56,7 @@ class KeychainService: NSObject {
         keychainQuery[kSecAttrGenericValue as! NSCopying] = keyData
         keychainQuery[kSecAttrAccountValue as! NSCopying] = keyData
         keychainQuery[kSecAttrServiceValue as! NSCopying] = "VPN"
-        keychainQuery[kSecAttrAccessibleValue as! NSCopying] = kSecAttrAccessibleAlwaysThisDeviceOnly
+        keychainQuery[kSecAttrAccessibleValue as! NSCopying] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         keychainQuery[kSecMatchLimit] = kSecMatchLimitOne
         keychainQuery[kSecReturnPersistentRef] = kCFBooleanTrue
 
@@ -106,6 +106,8 @@ class RNIpSecVpn: RCTEventEmitter {
                 print("VPN Preferences error: 1")
             } else {
                 let p = NEVPNProtocolIKEv2()
+                /* With Password Start */
+                /* 
                 p.username = username as String
                 p.remoteIdentifier = address as String
                 p.serverAddress = address as String
@@ -125,11 +127,36 @@ class RNIpSecVpn: RCTEventEmitter {
                 p.passwordReference = kcs.load(key: "password")
 
                 p.useExtendedAuthentication = true
-                p.disconnectOnSleep = false
+                p.disconnectOnSleep = false 
+                */
+                /* With Password End */
 
+                /* Without Password Start */
+                p.username = nil
+                // p.username = username as String
+                p.remoteIdentifier = address as String
+                p.localIdentifier = ""
+                p.serverAddress = address as String
+                p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
+
+                kcs.save(key: "sharedSecret", value: password as String)
+                p.sharedSecretReference = kcs.load(key: "sharedSecret")
+                p.passwordReference = nil
+
+                p.useExtendedAuthentication = false
+                p.disconnectOnSleep = false
+                
+                var rules = [NEOnDemandRule]()
+                let rule = NEOnDemandRuleConnect()
+                rule.interfaceTypeMatch = .any
+                rules.append(rule)
+                
+                vpnManager.onDemandRules = rules
+                vpnManager.isOnDemandEnabled = false
+                /* Without Password End */
                 vpnManager.protocolConfiguration = p
                 vpnManager.isEnabled = true
-                
+
                 let defaultErr = NSError()
 
                 vpnManager.saveToPreferences(completionHandler: { (error) -> Void in
