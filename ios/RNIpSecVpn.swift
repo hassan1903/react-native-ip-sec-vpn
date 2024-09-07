@@ -107,7 +107,7 @@ class RNIpSecVpn: RCTEventEmitter {
             } else {
                 let p = NEVPNProtocolIKEv2()
                 /* With Password Start */
-                /* 
+                /*
                 p.username = username as String
                 p.remoteIdentifier = address as String
                 p.serverAddress = address as String
@@ -127,7 +127,7 @@ class RNIpSecVpn: RCTEventEmitter {
                 p.passwordReference = kcs.load(key: "password")
 
                 p.useExtendedAuthentication = true
-                p.disconnectOnSleep = false 
+                p.disconnectOnSleep = false
                 */
                 /* With Password End */
 
@@ -207,6 +207,31 @@ class RNIpSecVpn: RCTEventEmitter {
                 print("VPN Disconnect error", error!)
             } else {
                 vpnManager.connection.stopVPNTunnel()
+                let p = NEVPNProtocolIKEv2()
+                let kcs = KeychainService()
+                p.username = nil
+                p.remoteIdentifier = ""
+                p.localIdentifier = ""
+                p.serverAddress = ""
+                p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
+
+                kcs.save(key: "sharedSecret", value: "")
+                p.sharedSecretReference = kcs.load(key: "sharedSecret")
+                p.passwordReference = nil
+
+                p.useExtendedAuthentication = false
+                p.disconnectOnSleep = false
+
+                var rules = [NEOnDemandRule]()
+                let rule = NEOnDemandRuleConnect()
+                rule.interfaceTypeMatch = .any
+                rules.append(rule)
+                
+                vpnManager.onDemandRules = rules
+                vpnManager.isOnDemandEnabled = false
+                vpnManager.protocolConfiguration = p
+                vpnManager.isEnabled = false
+                vpnManager.saveToPreferences()
             }
         })
         findEventsWithResolver(nil)
