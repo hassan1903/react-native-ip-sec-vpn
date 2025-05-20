@@ -41,7 +41,7 @@ exports.onStateChangedListener = (callback) => {
   return stateChanged.addListener(exports.STATE_CHANGED_EVENT_NAME, (e) => callback(e));
 };
 exports.prepare = react_native_1.NativeModules.RNIpSecVpn.prepare;
-exports.connect = (address, username, password, vpnType, mtu, enableKillSwitch) =>
+exports.connect = (address, username, password, vpnType, enableKillSwitch, mtu) =>
   react_native_1.NativeModules.RNIpSecVpn.connect(
     address || "",
     username || "",
@@ -52,6 +52,6 @@ exports.connect = (address, username, password, vpnType, mtu, enableKillSwitch) 
   );
 exports.getCurrentState = react_native_1.NativeModules.RNIpSecVpn.getCurrentState;
 exports.getCharonErrorState = react_native_1.NativeModules.RNIpSecVpn.getCharonErrorState;
-exports.disconnect = react_native_1.NativeModules.RNIpSecVpn.disconnect(enableKillSwitch || false);
+exports.disconnect = (enableKillSwitch) => react_native_1.NativeModules.RNIpSecVpn.disconnect(enableKillSwitch || false);
 exports.default = react_native_1.NativeModules.RNIpSecVpn;
 //# sourceMappingURL=index.js.map
