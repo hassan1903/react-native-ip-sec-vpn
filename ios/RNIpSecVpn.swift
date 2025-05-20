@@ -96,7 +96,7 @@ class RNIpSecVpn: RCTEventEmitter {
     }
     
     @objc
-    func connect(_ address: NSString, username: NSString, password: NSString, vpnType: NSString, mtu: NSNumber, findEventsWithResolver: @escaping RCTPromiseResolveBlock, rejecter: @escaping RCTPromiseRejectBlock) -> Void {
+    func connect(_ address: NSString, username: NSString, password: NSString, vpnType: NSString, mtu: NSNumber, enableKillSwitch: Bool, findEventsWithResolver: @escaping RCTPromiseResolveBlock, rejecter: @escaping RCTPromiseRejectBlock) -> Void {
         let vpnManager = NEVPNManager.shared()
         let kcs = KeychainService()
 
@@ -147,9 +147,17 @@ class RNIpSecVpn: RCTEventEmitter {
                 p.disconnectOnSleep = false
                 
                 var rules = [NEOnDemandRule]()
-                let rule = NEOnDemandRuleConnect()
-                rule.interfaceTypeMatch = .any
-                rules.append(rule)
+                if enableKillSwitch {
+                    let rule = NEOnDemandRuleDisconnect()
+                    rule.interfaceTypeMatch = .any
+                    rules.append(rule)
+                    vpnManager.isOnDemandEnabled = true
+                } else {
+                    let rule = NEOnDemandRuleConnect()
+                    rule.interfaceTypeMatch = .any
+                    rules.append(rule)
+                    vpnManager.isOnDemandEnabled = false
+                }
                 
                 vpnManager.onDemandRules = rules
                 vpnManager.isOnDemandEnabled = false
@@ -200,13 +208,14 @@ class RNIpSecVpn: RCTEventEmitter {
     }
     
     @objc
-    func disconnect(_ findEventsWithResolver: RCTPromiseResolveBlock, rejecter: RCTPromiseRejectBlock) -> Void {
+    func disconnect(_ enableKillSwitch: Bool, findEventsWithResolver: RCTPromiseResolveBlock, rejecter: RCTPromiseRejectBlock) -> Void {
         let vpnManager = NEVPNManager.shared()
         vpnManager.loadFromPreferences(completionHandler: { error in
             if error != nil {
                 print("VPN Disconnect error", error!)
             } else {
                 vpnManager.connection.stopVPNTunnel()
+
                 let p = NEVPNProtocolIKEv2()
                 let kcs = KeychainService()
                 p.username = nil
@@ -223,12 +232,19 @@ class RNIpSecVpn: RCTEventEmitter {
                 p.disconnectOnSleep = false
 
                 var rules = [NEOnDemandRule]()
-                let rule = NEOnDemandRuleConnect()
-                rule.interfaceTypeMatch = .any
-                rules.append(rule)
-                
+                if enableKillSwitch {
+                    let rule = NEOnDemandRuleDisconnect()
+                    rule.interfaceTypeMatch = .any
+                    rules.append(rule)
+                    vpnManager.isOnDemandEnabled = true
+                } else {
+                    let rule = NEOnDemandRuleConnect()
+                    rule.interfaceTypeMatch = .any
+                    rules.append(rule)
+                    vpnManager.isOnDemandEnabled = false
+                }
+
                 vpnManager.onDemandRules = rules
-                vpnManager.isOnDemandEnabled = false
                 vpnManager.protocolConfiguration = p
                 vpnManager.isEnabled = false
                 vpnManager.saveToPreferences()
