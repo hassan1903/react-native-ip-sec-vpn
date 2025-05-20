@@ -35,7 +35,7 @@ export const removeOnStateChangeListener: (stateChangedEvent: EmitterSubscriptio
 
 // set a change listener
 export const onStateChangedListener: (
-  callback: (state: { state: VpnState; charonState: CharonErrorState }) => void
+  callback: (state: { state: VpnState; charonState: CharonErrorState }) => void,
 ) => EmitterSubscription = (callback) => {
   return stateChanged.addListener(STATE_CHANGED_EVENT_NAME, (e: { state: VpnState; charonState: CharonErrorState }) => callback(e));
 };
@@ -60,13 +60,15 @@ export const prepare: () => Promise<void> = NativeModules.RNIpSecVpn.prepare;
 // use given credentials to connect VPN (ikev2-eap).
 // this will create a background VPN service.
 // mtu is only available on android.
-export const connect: (address: string, username: string, password: string, vpnType?: string, mtu?: number) => Promise<void> = (
-  address,
-  username,
-  password,
-  vpnType,
-  mtu
-) => NativeModules.RNIpSecVpn.connect(address || "", username || "", password || "", vpnType || "", mtu || 1400);
+export const connect: (
+  address: string,
+  username: string,
+  password: string,
+  vpnType?: string,
+  enableKillSwitch?: boolean,
+  mtu?: number,
+) => Promise<void> = (address, username, password, vpnType, enableKillSwitch, mtu) =>
+  NativeModules.RNIpSecVpn.connect(address || "", username || "", password || "", vpnType || "", enableKillSwitch || false, mtu || 1400);
 
 // get current state
 export const getCurrentState: () => Promise<VpnState> = NativeModules.RNIpSecVpn.getCurrentState;
@@ -78,6 +80,6 @@ export const getCharonErrorState: () => Promise<CharonErrorState> = NativeModule
 
 // disconnect and stop VPN service.
 // does not raise any exception
-export const disconnect: () => Promise<void> = NativeModules.RNIpSecVpn.disconnect;
+export const disconnect: (enableKillSwitch?: boolean) => Promise<void> = NativeModules.RNIpSecVpn.disconnect(enableKillSwitch || false);
 
 export default NativeModules.RNIpSecVpn;
