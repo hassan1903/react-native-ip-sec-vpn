@@ -151,16 +151,14 @@ class RNIpSecVpn: RCTEventEmitter {
                     let rule = NEOnDemandRuleDisconnect()
                     rule.interfaceTypeMatch = .any
                     rules.append(rule)
-                    vpnManager.isOnDemandEnabled = true
                 } else {
                     let rule = NEOnDemandRuleConnect()
                     rule.interfaceTypeMatch = .any
                     rules.append(rule)
-                    vpnManager.isOnDemandEnabled = false
                 }
                 
                 vpnManager.onDemandRules = rules
-                vpnManager.isOnDemandEnabled = false
+                vpnManager.isOnDemandEnabled = true
                 /* Without Password End */
                 vpnManager.protocolConfiguration = p
                 vpnManager.isEnabled = true
@@ -236,15 +234,14 @@ class RNIpSecVpn: RCTEventEmitter {
                     let rule = NEOnDemandRuleDisconnect()
                     rule.interfaceTypeMatch = .any
                     rules.append(rule)
-                    vpnManager.isOnDemandEnabled = true
                 } else {
                     let rule = NEOnDemandRuleConnect()
                     rule.interfaceTypeMatch = .any
                     rules.append(rule)
-                    vpnManager.isOnDemandEnabled = false
                 }
 
                 vpnManager.onDemandRules = rules
+                vpnManager.isOnDemandEnabled = true
                 vpnManager.protocolConfiguration = p
                 vpnManager.isEnabled = false
                 vpnManager.saveToPreferences()
