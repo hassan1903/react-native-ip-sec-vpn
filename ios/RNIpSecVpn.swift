@@ -232,20 +232,8 @@ class RNIpSecVpn: RCTEventEmitter {
 
                 p.disconnectOnSleep = false
 
-                var rules = [NEOnDemandRule]()
-                if enableKillSwitch {
-                    let rule = NEOnDemandRuleDisconnect()
-                    rule.interfaceTypeMatch = .any
-                    rules.append(rule)
-                    vpnManager.isOnDemandEnabled = true
-                } else {
-                    let rule = NEOnDemandRuleConnect()
-                    rule.interfaceTypeMatch = .any
-                    rules.append(rule)
-                    vpnManager.isOnDemandEnabled = false
-                }
-
-                vpnManager.onDemandRules = rules
+                vpnManager.onDemandRules = []
+                vpnManager.isOnDemandEnabled = false
                 vpnManager.protocolConfiguration = p
                 vpnManager.isEnabled = false
                 vpnManager.saveToPreferences()
