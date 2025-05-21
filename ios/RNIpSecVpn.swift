@@ -114,101 +114,99 @@ class RNIpSecVpn: RCTEventEmitter {
                 rejecter("VPN_PREF_LOAD_ERR", error.localizedDescription, error)
                 return
             }
-
             let p = NEVPNProtocolIKEv2()
-                /* With Password Start */
-                /*
-                p.username = username as String
-                p.remoteIdentifier = address as String
-                p.serverAddress = address as String
-                p.authenticationMethod = NEVPNIKEAuthenticationMethod.none
-                p.childSecurityAssociationParameters.diffieHellmanGroup = NEVPNIKEv2DiffieHellmanGroup.group20
-                p.childSecurityAssociationParameters.lifetimeMinutes = 1440
-                p.childSecurityAssociationParameters.encryptionAlgorithm = NEVPNIKEv2EncryptionAlgorithm.algorithmAES256GCM
-                p.childSecurityAssociationParameters.integrityAlgorithm = NEVPNIKEv2IntegrityAlgorithm.SHA384
-                p.ikeSecurityAssociationParameters.diffieHellmanGroup = NEVPNIKEv2DiffieHellmanGroup.group20
-                p.ikeSecurityAssociationParameters.lifetimeMinutes = 1440
-                p.ikeSecurityAssociationParameters.encryptionAlgorithm = NEVPNIKEv2EncryptionAlgorithm.algorithmAES256GCM
-                p.ikeSecurityAssociationParameters.integrityAlgorithm = NEVPNIKEv2IntegrityAlgorithm.SHA384
-                p.enablePFS = true
-                p.enableRevocationCheck = true
+            /* With Password Start */
+            /*
+            p.username = username as String
+            p.remoteIdentifier = address as String
+            p.serverAddress = address as String
+            p.authenticationMethod = NEVPNIKEAuthenticationMethod.none
+            p.childSecurityAssociationParameters.diffieHellmanGroup = NEVPNIKEv2DiffieHellmanGroup.group20
+            p.childSecurityAssociationParameters.lifetimeMinutes = 1440
+            p.childSecurityAssociationParameters.encryptionAlgorithm = NEVPNIKEv2EncryptionAlgorithm.algorithmAES256GCM
+            p.childSecurityAssociationParameters.integrityAlgorithm = NEVPNIKEv2IntegrityAlgorithm.SHA384
+            p.ikeSecurityAssociationParameters.diffieHellmanGroup = NEVPNIKEv2DiffieHellmanGroup.group20
+            p.ikeSecurityAssociationParameters.lifetimeMinutes = 1440
+            p.ikeSecurityAssociationParameters.encryptionAlgorithm = NEVPNIKEv2EncryptionAlgorithm.algorithmAES256GCM
+            p.ikeSecurityAssociationParameters.integrityAlgorithm = NEVPNIKEv2IntegrityAlgorithm.SHA384
+            p.enablePFS = true
+            p.enableRevocationCheck = true
 
-                kcs.save(key: "password", value: password as String)
-                p.passwordReference = kcs.load(key: "password")
+            kcs.save(key: "password", value: password as String)
+            p.passwordReference = kcs.load(key: "password")
 
-                p.useExtendedAuthentication = true
-                p.disconnectOnSleep = false
-                */
-                /* With Password End */
+            p.useExtendedAuthentication = true
+            p.disconnectOnSleep = false
+            */
+            /* With Password End */
 
-                /* Without Password Start */
-                p.username = nil
-                // p.username = username as String
-                p.remoteIdentifier = address as String
-                p.localIdentifier = ""
-                p.serverAddress = address as String
-                p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
+            /* Without Password Start */
+            p.username = nil
+            // p.username = username as String
+            p.remoteIdentifier = address as String
+            p.localIdentifier = ""
+            p.serverAddress = address as String
+            p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
 
-                kcs.save(key: "sharedSecret", value: password as String)
-                p.sharedSecretReference = kcs.load(key: "sharedSecret")
-                p.passwordReference = nil
+            kcs.save(key: "sharedSecret", value: password as String)
+            p.sharedSecretReference = kcs.load(key: "sharedSecret")
+            p.passwordReference = nil
 
-                p.useExtendedAuthentication = true
-                p.disconnectOnSleep = false
-                // ✅ On-demand rules
-                var rules = [NEOnDemandRule]()
-                let rule = NEOnDemandRuleConnect()
-                rule.interfaceTypeMatch = .any
-                rules.append(rule)
-                if enableKillSwitch {
-                    let disconnectRule = NEOnDemandRuleDisconnect()
-                    disconnectRule.interfaceTypeMatch = .any
-                    rules.append(disconnectRule)
-                }
-                vpnManager.onDemandRules = rules
-                vpnManager.isOnDemandEnabled = true
-                /* Without Password End */
-                vpnManager.protocolConfiguration = p
-                vpnManager.isEnabled = true
-                /* Without Password End */
-                // ✅ Save and start
-                let defaultErr = NSError()
-
-                vpnManager.saveToPreferences(completionHandler: { (error) -> Void in
-                    if error != nil {
-                        print("VPN Preferences error: 2")
-                    } else {
-                        vpnManager.loadFromPreferences(completionHandler: { error in
-                            if error != nil {
-                                print("VPN Preferences error: 2")
-                                rejecter("VPN_ERR", "VPN Preferences error: 2", defaultErr)
-                            } else {
-                                var startError: NSError?
-
-                                do {
-                                    try vpnManager.connection.startVPNTunnel()
-                                } catch let error as NSError {
-                                    startError = error
-                                    print(startError ?? "VPN Manager cannot start tunnel")
-                                    rejecter("VPN_ERR", "VPN Manager cannot start tunnel", startError)
-                                } catch {
-                                    print("Fatal Error")
-                                    rejecter("VPN_ERR", "Fatal Error", NSError(domain: "", code: 200, userInfo: nil))
-                                    fatalError()
-                                }
-                                if startError != nil {
-                                    print("VPN Preferences error: 3")
-                                    print(startError ?? "Start Error")
-                                    rejecter("VPN_ERR", "VPN Preferences error: 3", startError)
-                                } else {
-                                    print("VPN started successfully..")
-                                    findEventsWithResolver(nil)
-                                }
-                            }
-                        })
-                    }
-                })
+            p.useExtendedAuthentication = false
+            p.disconnectOnSleep = false
+            // ✅ On-demand rules
+            var rules = [NEOnDemandRule]()
+            let rule = NEOnDemandRuleConnect()
+            rule.interfaceTypeMatch = .any
+            rules.append(rule)
+            if enableKillSwitch {
+                let disconnectRule = NEOnDemandRuleDisconnect()
+                disconnectRule.interfaceTypeMatch = .any
+                rules.append(disconnectRule)
             }
+            vpnManager.onDemandRules = rules
+            vpnManager.isOnDemandEnabled = false
+            /* Without Password End */
+            vpnManager.protocolConfiguration = p
+            vpnManager.isEnabled = true
+            // ✅ Save and start
+            let defaultErr = NSError()
+
+            vpnManager.saveToPreferences(completionHandler: { (error) -> Void in
+                if error != nil {
+                    print("VPN Preferences error: 2")
+                } else {
+                    vpnManager.loadFromPreferences(completionHandler: { error in
+
+                        if error != nil {
+                            print("VPN Preferences error: 2")
+                            rejecter("VPN_ERR", "VPN Preferences error: 2", defaultErr)
+                        } else {
+                            var startError: NSError?
+
+                            do {
+                                try vpnManager.connection.startVPNTunnel()
+                            } catch let error as NSError {
+                                startError = error
+                                print(startError ?? "VPN Manager cannot start tunnel")
+                                rejecter("VPN_ERR", "VPN Manager cannot start tunnel", startError)
+                            } catch {
+                                print("Fatal Error")
+                                rejecter("VPN_ERR", "Fatal Error", NSError(domain: "", code: 200, userInfo: nil))
+                                fatalError()
+                            }
+                            if startError != nil {
+                                print("VPN Preferences error: 3")
+                                print(startError ?? "Start Error")
+                                rejecter("VPN_ERR", "VPN Preferences error: 3", startError)
+                            } else {
+                                print("VPN started successfully..")
+                                findEventsWithResolver(nil)
+                            }
+                        }
+                    })
+                }
+            })
         }
     }
     
@@ -216,32 +214,31 @@ class RNIpSecVpn: RCTEventEmitter {
     func disconnect(_ findEventsWithResolver: RCTPromiseResolveBlock, rejecter: RCTPromiseRejectBlock) -> Void {
         let vpnManager = NEVPNManager.shared()
         vpnManager.loadFromPreferences(completionHandler: { error in
-            if let error = error {
-                print("VPN Disconnect error", error)
-                rejecter("VPN_PREF_LOAD_ERR", error.localizedDescription, error)
-                return
+            if error != nil {
+                print("VPN Disconnect error", error!)
+            } else {
+                vpnManager.connection.stopVPNTunnel()
+                let p = NEVPNProtocolIKEv2()
+                let kcs = KeychainService()
+                p.username = nil
+                p.remoteIdentifier = ""
+                p.localIdentifier = ""
+                p.serverAddress = ""
+                p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
+
+                kcs.save(key: "sharedSecret", value: "")
+                p.sharedSecretReference = kcs.load(key: "sharedSecret")
+                p.passwordReference = nil
+
+                p.useExtendedAuthentication = false
+                p.disconnectOnSleep = false
+
+                vpnManager.onDemandRules = []
+                vpnManager.isOnDemandEnabled = false
+                vpnManager.protocolConfiguration = p
+                vpnManager.isEnabled = false
+                vpnManager.saveToPreferences()
             }
-            vpnManager.connection.stopVPNTunnel()
-            let p = NEVPNProtocolIKEv2()
-            let kcs = KeychainService()
-            p.username = nil
-            p.remoteIdentifier = ""
-            p.localIdentifier = ""
-            p.serverAddress = ""
-            p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
-
-            kcs.save(key: "sharedSecret", value: "")
-            p.sharedSecretReference = kcs.load(key: "sharedSecret")
-            p.passwordReference = nil
-
-            p.useExtendedAuthentication = true
-            p.disconnectOnSleep = false
-                
-            vpnManager.onDemandRules = []
-            vpnManager.isOnDemandEnabled = false
-            vpnManager.protocolConfiguration = p
-            vpnManager.isEnabled = false
-            vpnManager.saveToPreferences()
         })
         findEventsWithResolver(nil)
     }
