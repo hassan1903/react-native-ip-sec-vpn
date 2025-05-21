@@ -96,16 +96,26 @@ class RNIpSecVpn: RCTEventEmitter {
     }
     
     @objc
-    func connect(_ address: NSString, username: NSString, password: NSString, vpnType: NSString, enableKillSwitch: Bool, mtu: NSNumber, findEventsWithResolver: @escaping RCTPromiseResolveBlock, rejecter: @escaping RCTPromiseRejectBlock) -> Void {
+    func connect(
+    _ address: NSString,
+    username: NSString,
+    password: NSString,
+    vpnType: NSString,
+    enableKillSwitch: Bool,
+    mtu: NSNumber,
+    findEventsWithResolver: @escaping RCTPromiseResolveBlock,
+    rejecter: @escaping RCTPromiseRejectBlock
+    ) -> Void {
         let vpnManager = NEVPNManager.shared()
         let kcs = KeychainService()
 
-        vpnManager.loadFromPreferences { (error) -> Void in
-
-            if error != nil {
-                print("VPN Preferences error: 1")
-            } else {
-                let p = NEVPNProtocolIKEv2()
+        vpnManager.loadFromPreferences { error in
+            if let error = error {
+                print("❌ Failed to load preferences:", error)
+                rejecter("VPN_PREF_LOAD_ERR", error.localizedDescription, error)
+                return
+            }
+            let p = NEVPNProtocolIKEv2()
                 /* With Password Start */
                 /*
                 p.username = username as String
@@ -132,12 +142,11 @@ class RNIpSecVpn: RCTEventEmitter {
                 /* With Password End */
 
                 /* Without Password Start */
-                p.username = nil
-                // p.username = username as String
+                p.serverAddress = address as String
                 p.remoteIdentifier = address as String
                 p.localIdentifier = ""
-                p.serverAddress = address as String
-                p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
+                p.username = nil
+                p.authenticationMethod = .sharedSecret
 
                 kcs.save(key: "sharedSecret", value: password as String)
                 p.sharedSecretReference = kcs.load(key: "sharedSecret")
@@ -145,68 +154,49 @@ class RNIpSecVpn: RCTEventEmitter {
 
                 p.useExtendedAuthentication = true
                 p.disconnectOnSleep = false
-                
-                var rules = [NEOnDemandRule]()
-                if enableKillSwitch {
-                    let connectRule = NEOnDemandRuleConnect()
-                    connectRule.interfaceTypeMatch = .any
-                    rules.append(connectRule)
 
-                    let disconnectRule = NEOnDemandRuleDisconnect()
-                    disconnectRule.interfaceTypeMatch = .any
-                    rules.append(disconnectRule)
-                } else {
-                    let rule = NEOnDemandRuleConnect()
-                    rule.interfaceTypeMatch = .any
-                    rules.append(rule)
-                }
-                
-                vpnManager.onDemandRules = rules
-                vpnManager.isOnDemandEnabled = true
-                /* Without Password End */
                 vpnManager.protocolConfiguration = p
                 vpnManager.isEnabled = true
 
-                let defaultErr = NSError()
+                // ✅ On-demand rules
+                var rules = [NEOnDemandRule]()
 
-                vpnManager.saveToPreferences(completionHandler: { (error) -> Void in
-                    if error != nil {
-                        print("VPN Preferences error: 2")
-                    } else {
-                        vpnManager.loadFromPreferences(completionHandler: { error in
+                if enableKillSwitch {
+                    let connectRule = NEOnDemandRuleConnect()
+                    connectRule.interfaceTypeMatch = .any
 
-                            if error != nil {
-                                print("VPN Preferences error: 2")
-                                rejecter("VPN_ERR", "VPN Preferences error: 2", defaultErr)
-                            } else {
-                                var startError: NSError?
+                    let disconnectRule = NEOnDemandRuleDisconnect()
+                    disconnectRule.interfaceTypeMatch = .any
 
-                                do {
-                                    try vpnManager.connection.startVPNTunnel()
-                                } catch let error as NSError {
-                                    startError = error
-                                    print(startError ?? "VPN Manager cannot start tunnel")
-                                    rejecter("VPN_ERR", "VPN Manager cannot start tunnel", startError)
-                                } catch {
-                                    print("Fatal Error")
-                                    rejecter("VPN_ERR", "Fatal Error", NSError(domain: "", code: 200, userInfo: nil))
-                                    fatalError()
-                                }
-                                if startError != nil {
-                                    print("VPN Preferences error: 3")
-                                    print(startError ?? "Start Error")
-                                    rejecter("VPN_ERR", "VPN Preferences error: 3", startError)
-                                } else {
-                                    print("VPN started successfully..")
-                                    findEventsWithResolver(nil)
-                                }
-                            }
-                        })
+                    rules = [connectRule, disconnectRule]
+                } else {
+                    let connectRule = NEOnDemandRuleConnect()
+                    connectRule.interfaceTypeMatch = .any
+
+                    rules = [connectRule]
+                }
+
+                vpnManager.isOnDemandEnabled = true
+                vpnManager.onDemandRules = rules
+                /* Without Password End */
+                // ✅ Save and start
+                vpnManager.saveToPreferences { saveError in
+                    if let saveError = saveError {
+                        print("❌ Failed to save preferences:", saveError)
+                        rejecter("VPN_SAVE_ERR", saveError.localizedDescription, saveError)
+                        return
                     }
-                })
+
+                    do {
+                        try vpnManager.connection.startVPNTunnel()
+                        print("✅ VPN started")
+                        findEventsWithResolver(nil)
+                    } catch let startErr {
+                        print("❌ VPN start failed:", startErr)
+                        rejecter("VPN_START_ERR", startErr.localizedDescription, startErr)
+                    }
+                }
             }
-        }
-        
     }
     
     @objc
