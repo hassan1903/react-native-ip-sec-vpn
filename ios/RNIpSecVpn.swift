@@ -142,11 +142,12 @@ class RNIpSecVpn: RCTEventEmitter {
                 /* With Password End */
 
                 /* Without Password Start */
-                p.serverAddress = address as String
+                p.username = nil
+                // p.username = username as String
                 p.remoteIdentifier = address as String
                 p.localIdentifier = ""
-                p.username = nil
-                p.authenticationMethod = .sharedSecret
+                p.serverAddress = address as String
+                p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
 
                 kcs.save(key: "sharedSecret", value: password as String)
                 p.sharedSecretReference = kcs.load(key: "sharedSecret")
@@ -156,65 +157,93 @@ class RNIpSecVpn: RCTEventEmitter {
                 p.disconnectOnSleep = false
                 // ✅ On-demand rules
                 var rules = [NEOnDemandRule]()
-
-                let connectRule = NEOnDemandRuleConnect()
-                connectRule.interfaceTypeMatch = .any
-                rules.append(connectRule)
+                let rule = NEOnDemandRuleConnect()
+                rule.interfaceTypeMatch = .any
+                rules.append(rule)
                 if enableKillSwitch {
                     let disconnectRule = NEOnDemandRuleDisconnect()
                     disconnectRule.interfaceTypeMatch = .any
                     rules.append(disconnectRule)
                 }
-                rules.forEach { $0.interfaceTypeMatch = .any }
-
                 vpnManager.onDemandRules = rules
                 vpnManager.isOnDemandEnabled = true
-
+                /* Without Password End */
                 vpnManager.protocolConfiguration = p
                 vpnManager.isEnabled = true
                 /* Without Password End */
                 // ✅ Save and start
-                vpnManager.saveToPreferences { saveError in
-                    if let saveError = saveError {
-                        print("❌ Failed to save preferences:", saveError)
-                        rejecter("VPN_SAVE_ERR", saveError.localizedDescription, saveError)
-                        return
-                    }
+                let defaultErr = NSError()
 
-                    do {
-                        try vpnManager.connection.startVPNTunnel()
-                        print("✅ VPN started")
-                        findEventsWithResolver(nil)
-                    } catch let startErr {
-                        print("❌ VPN start failed:", startErr)
-                        rejecter("VPN_START_ERR", startErr.localizedDescription, startErr)
+                vpnManager.saveToPreferences(completionHandler: { (error) -> Void in
+                    if error != nil {
+                        print("VPN Preferences error: 2")
+                    } else {
+                        vpnManager.loadFromPreferences(completionHandler: { error in
+                            if error != nil {
+                                print("VPN Preferences error: 2")
+                                rejecter("VPN_ERR", "VPN Preferences error: 2", defaultErr)
+                            } else {
+                                var startError: NSError?
+
+                                do {
+                                    try vpnManager.connection.startVPNTunnel()
+                                } catch let error as NSError {
+                                    startError = error
+                                    print(startError ?? "VPN Manager cannot start tunnel")
+                                    rejecter("VPN_ERR", "VPN Manager cannot start tunnel", startError)
+                                } catch {
+                                    print("Fatal Error")
+                                    rejecter("VPN_ERR", "Fatal Error", NSError(domain: "", code: 200, userInfo: nil))
+                                    fatalError()
+                                }
+                                if startError != nil {
+                                    print("VPN Preferences error: 3")
+                                    print(startError ?? "Start Error")
+                                    rejecter("VPN_ERR", "VPN Preferences error: 3", startError)
+                                } else {
+                                    print("VPN started successfully..")
+                                    findEventsWithResolver(nil)
+                                }
+                            }
+                        })
                     }
-                }
+                })
             }
+        }
     }
     
     @objc
-    func disconnect(_ findEventsWithResolver: @escaping RCTPromiseResolveBlock,
-                    rejecter: @escaping RCTPromiseRejectBlock) -> Void {
-
+    func disconnect(_ findEventsWithResolver: RCTPromiseResolveBlock, rejecter: RCTPromiseRejectBlock) -> Void {
         let vpnManager = NEVPNManager.shared()
-
-        vpnManager.loadFromPreferences { error in
+        vpnManager.loadFromPreferences(completionHandler: { error in
             if let error = error {
                 print("VPN Disconnect error", error)
                 rejecter("VPN_PREF_LOAD_ERR", error.localizedDescription, error)
                 return
             }
             vpnManager.connection.stopVPNTunnel()
+            let p = NEVPNProtocolIKEv2()
+            let kcs = KeychainService()
+            p.username = nil
+            p.remoteIdentifier = ""
+            p.localIdentifier = ""
+            p.serverAddress = ""
+            p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
 
+            kcs.save(key: "sharedSecret", value: "")
+            p.sharedSecretReference = kcs.load(key: "sharedSecret")
+            p.passwordReference = nil
+
+            p.useExtendedAuthentication = true
+            p.disconnectOnSleep = false
+                
             vpnManager.onDemandRules = []
             vpnManager.isOnDemandEnabled = false
+            vpnManager.protocolConfiguration = p
             vpnManager.isEnabled = false
-
-            vpnManager.saveToPreferences { _ in
-                findEventsWithResolver(nil)
-            }
-        }
+            vpnManager.saveToPreferences()
+        })
+        findEventsWithResolver(nil)
     }
     
     @objc
