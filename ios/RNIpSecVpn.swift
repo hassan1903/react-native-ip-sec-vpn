@@ -143,7 +143,7 @@ class RNIpSecVpn: RCTEventEmitter {
                 p.sharedSecretReference = kcs.load(key: "sharedSecret")
                 p.passwordReference = nil
 
-                p.useExtendedAuthentication = false
+                p.useExtendedAuthentication = true
                 p.disconnectOnSleep = false
                 
                 var rules = [NEOnDemandRule]()
@@ -230,7 +230,6 @@ class RNIpSecVpn: RCTEventEmitter {
                 p.sharedSecretReference = kcs.load(key: "sharedSecret")
                 p.passwordReference = nil
 
-                p.useExtendedAuthentication = false
                 p.disconnectOnSleep = false
 
                 var rules = [NEOnDemandRule]()
