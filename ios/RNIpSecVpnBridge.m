@@ -19,9 +19,7 @@ RCT_EXTERN_METHOD(connect:(NSString *)address
                   mtu:(NSNumber *_Nonnull)mtu
                   findEventsWithResolver:(RCTPromiseResolveBlock)findEventsWithResolver
                   rejecter:(RCTPromiseRejectBlock)rejecter)
-RCT_EXTERN_METHOD(disconnect:(BOOL)enableKillSwitch
-                  findEventsWithResolver:(RCTPromiseResolveBlock)findEventsWithResolver
-                  rejecter:(RCTPromiseRejectBlock)rejecter)
+RCT_EXTERN_METHOD(disconnect:(RCTPromiseResolveBlock)findEventsWithResolver rejecter:(RCTPromiseRejectBlock)rejecter)
 RCT_EXTERN_METHOD(getCurrentState:(RCTPromiseResolveBlock)findEventsWithResolver rejecter:(RCTPromiseRejectBlock)rejecter)
 RCT_EXTERN_METHOD(getCharonErrorState:(RCTPromiseResolveBlock)findEventsWithResolver rejecter:(RCTPromiseRejectBlock)rejecter)
 

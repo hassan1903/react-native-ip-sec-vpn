@@ -34,6 +34,6 @@ export declare const connect: (
 ) => Promise<void>;
 export declare const getCurrentState: () => Promise<VpnState>;
 export declare const getCharonErrorState: () => Promise<CharonErrorState>;
-export declare const disconnect: (enableKillSwitch?: boolean) => Promise<void>;
+export declare const disconnect: () => Promise<void>;
 declare const _default: any;
 export default _default;

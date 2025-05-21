@@ -80,7 +80,6 @@ export const getCharonErrorState: () => Promise<CharonErrorState> = NativeModule
 
 // disconnect and stop VPN service.
 // does not raise any exception
-export const disconnect: (enableKillSwitch?: boolean) => Promise<void> = (enableKillSwitch) =>
-  NativeModules.RNIpSecVpn.disconnect(enableKillSwitch || false);
+export const disconnect: () => Promise<void> = NativeModules.RNIpSecVpn.disconnect;
 
 export default NativeModules.RNIpSecVpn;

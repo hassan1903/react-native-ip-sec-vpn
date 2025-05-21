@@ -52,6 +52,6 @@ exports.connect = (address, username, password, vpnType, enableKillSwitch, mtu) 
   );
 exports.getCurrentState = react_native_1.NativeModules.RNIpSecVpn.getCurrentState;
 exports.getCharonErrorState = react_native_1.NativeModules.RNIpSecVpn.getCharonErrorState;
-exports.disconnect = (enableKillSwitch) => react_native_1.NativeModules.RNIpSecVpn.disconnect(enableKillSwitch || false);
+exports.disconnect = react_native_1.NativeModules.RNIpSecVpn.disconnect;
 exports.default = react_native_1.NativeModules.RNIpSecVpn;
 //# sourceMappingURL=index.js.map
