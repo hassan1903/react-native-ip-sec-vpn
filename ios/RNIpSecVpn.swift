@@ -165,7 +165,7 @@ class RNIpSecVpn: RCTEventEmitter {
                 rules.append(disconnectRule)
             }
             vpnManager.onDemandRules = rules
-            vpnManager.isOnDemandEnabled = false
+            vpnManager.isOnDemandEnabled = true
             /* Without Password End */
             vpnManager.protocolConfiguration = p
             vpnManager.isEnabled = true
