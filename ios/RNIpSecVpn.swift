@@ -148,9 +148,13 @@ class RNIpSecVpn: RCTEventEmitter {
                 
                 var rules = [NEOnDemandRule]()
                 if enableKillSwitch {
-                    let rule = NEOnDemandRuleDisconnect()
-                    rule.interfaceTypeMatch = .any
-                    rules.append(rule)
+                    let connectRule = NEOnDemandRuleConnect()
+                    connectRule.interfaceTypeMatch = .any
+                    rules.append(connectRule)
+
+                    let disconnectRule = NEOnDemandRuleDisconnect()
+                    disconnectRule.interfaceTypeMatch = .any
+                    rules.append(disconnectRule)
                 } else {
                     let rule = NEOnDemandRuleConnect()
                     rule.interfaceTypeMatch = .any
