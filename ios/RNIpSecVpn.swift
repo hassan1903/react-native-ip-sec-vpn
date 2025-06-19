@@ -4,28 +4,15 @@
 //
 //  Created by Hasan Kucukoztas on 25/02/2024.
 //  Copyright © 2025 HK Kucukoztas. All rights reserved.
-//
 
 import Foundation
 import NetworkExtension
 import Security
 
-// Identifiers
-let serviceIdentifier = "MySerivice"
-let userAccount = "authenticatedUser"
-let accessGroup = "MySerivice"
-
-// Arguments for the keychain queries
-var kSecAttrAccessGroupSwift = NSString(format: kSecClass)
-
 let kSecClassValue = kSecClass as CFString
 let kSecAttrAccountValue = kSecAttrAccount as CFString
-let kSecValueDataValue = kSecValueData as CFString
 let kSecClassGenericPasswordValue = kSecClassGenericPassword as CFString
 let kSecAttrServiceValue = kSecAttrService as CFString
-let kSecMatchLimitValue = kSecMatchLimit as CFString
-let kSecReturnDataValue = kSecReturnData as CFString
-let kSecMatchLimitOneValue = kSecMatchLimitOne as CFString
 let kSecAttrGenericValue = kSecAttrGeneric as CFString
 let kSecAttrAccessibleValue = kSecAttrAccessible as CFString
 
@@ -64,7 +51,7 @@ class KeychainService: NSObject {
 
     var result: AnyObject?
     let status = withUnsafeMutablePointer(to: &result) {
-      SecItemCopyMatching(keychainQuery, UnsafeMutablePointer($0))
+      SecItemCopyMatching(keychainQuery as CFDictionary, UnsafeMutablePointer($0))
     }
 
     if status == errSecSuccess {
@@ -90,7 +77,6 @@ class RNIpSecVpn: RCTEventEmitter {
 
   @objc
   func prepare(_ findEventsWithResolver: RCTPromiseResolveBlock, rejecter: RCTPromiseRejectBlock) {
-
     // Register to be notified of changes in the status. These notifications only work when app is in foreground.
     NotificationCenter.default.addObserver(
       forName: NSNotification.Name.NEVPNStatusDidChange, object: nil, queue: nil
@@ -114,6 +100,35 @@ class RNIpSecVpn: RCTEventEmitter {
     findEventsWithResolver: @escaping RCTPromiseResolveBlock,
     rejecter: @escaping RCTPromiseRejectBlock
   ) {
+    if vpnType.lowercased == "wireguard" {
+      let manager = NETunnelProviderManager()
+      manager.loadFromPreferences { error in
+        if let error = error {
+          rejecter("VPN_PREF_LOAD_ERR", error.localizedDescription, error)
+          return
+        }
+        let proto = NETunnelProviderProtocol()
+        proto.providerBundleIdentifier = "com.example.PacketTunnel"
+        proto.serverAddress = address as String
+        proto.providerConfiguration = ["wgConfig": password as String, "mtu": mtu]
+
+        manager.protocolConfiguration = proto
+        manager.isEnabled = true
+        manager.saveToPreferences { error in
+          if let error = error {
+            rejecter("VPN_ERR", error.localizedDescription, error)
+            return
+          }
+          do {
+            try manager.connection.startVPNTunnel()
+            findEventsWithResolver(nil)
+          } catch let error {
+            rejecter("VPN_ERR", error.localizedDescription, error)
+          }
+        }
+      }
+      return
+    }
 
     let vpnManager = NEVPNManager.shared()
     let kcs = KeychainService()
@@ -221,50 +236,71 @@ class RNIpSecVpn: RCTEventEmitter {
   }
 
   @objc
-  func disconnect(_ findEventsWithResolver: RCTPromiseResolveBlock, rejecter: RCTPromiseRejectBlock)
-  {
-    let vpnManager = NEVPNManager.shared()
-    vpnManager.loadFromPreferences(completionHandler: { error in
-      if error != nil {
-        print("VPN Disconnect error", error!)
-      } else {
-        vpnManager.connection.stopVPNTunnel()
-        let p = NEVPNProtocolIKEv2()
-        let kcs = KeychainService()
-        p.username = nil
-        p.remoteIdentifier = ""
-        p.localIdentifier = ""
-        p.serverAddress = ""
-        p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
-
-        kcs.save(key: "sharedSecret", value: "")
-        p.sharedSecretReference = kcs.load(key: "sharedSecret")
-        p.passwordReference = nil
-
-        p.useExtendedAuthentication = false
-        p.disconnectOnSleep = false
-
-        vpnManager.onDemandRules = []
-        vpnManager.isOnDemandEnabled = false
-        vpnManager.protocolConfiguration = p
-        vpnManager.isEnabled = false
-        vpnManager.saveToPreferences()
+  func disconnect(
+    _ vpnType: NSString,
+    findEventsWithResolver: @escaping RCTPromiseResolveBlock,
+    rejecter: @escaping RCTPromiseRejectBlock
+  ) {
+    if vpnType.lowercased == "wireguard" {
+      let wgManager = NETunnelProviderManager()
+      wgManager.loadFromPreferences { _ in
+        wgManager.connection.stopVPNTunnel()
+        findEventsWithResolver(nil)
       }
-    })
-    findEventsWithResolver(nil)
+    } else {
+      let vpnManager = NEVPNManager.shared()
+      vpnManager.loadFromPreferences(completionHandler: { error in
+        if error != nil {
+          print("VPN Disconnect error", error!)
+        } else {
+          vpnManager.connection.stopVPNTunnel()
+          let p = NEVPNProtocolIKEv2()
+          let kcs = KeychainService()
+          p.username = nil
+          p.remoteIdentifier = ""
+          p.localIdentifier = ""
+          p.serverAddress = ""
+          p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
+
+          kcs.save(key: "sharedSecret", value: "")
+          p.sharedSecretReference = kcs.load(key: "sharedSecret")
+          p.passwordReference = nil
+
+          p.useExtendedAuthentication = false
+          p.disconnectOnSleep = false
+
+          vpnManager.onDemandRules = []
+          vpnManager.isOnDemandEnabled = false
+          vpnManager.protocolConfiguration = p
+          vpnManager.isEnabled = false
+          vpnManager.saveToPreferences()
+        }
+      })
+      findEventsWithResolver(nil)
+    }
   }
 
   @objc
   func getCurrentState(
-    _ findEventsWithResolver: RCTPromiseResolveBlock, rejecter: RCTPromiseRejectBlock
+    _ vpnType: NSString,
+    findEventsWithResolver: @escaping RCTPromiseResolveBlock,
+    rejecter: @escaping RCTPromiseRejectBlock
   ) {
-    let vpnManager = NEVPNManager.shared()
-    let status = checkNEStatus(status: vpnManager.connection.status)
-    if status.intValue < 5 {
-      findEventsWithResolver(status)
+    if vpnType.lowercased == "wireguard" {
+      let wgManager = NETunnelProviderManager()
+      wgManager.loadFromPreferences { _ in
+        let status = checkNEStatus(status: wgManager.connection.status)
+        findEventsWithResolver(status)
+      }
     } else {
-      rejecter("VPN_ERR", "Unknown state", NSError())
-      fatalError()
+      let vpnManager = NEVPNManager.shared()
+      let status = checkNEStatus(status: vpnManager.connection.status)
+      if status.intValue < 5 {
+        findEventsWithResolver(status)
+      } else {
+        rejecter("VPN_ERR", "Unknown state", NSError())
+        fatalError()
+      }
     }
   }
 
@@ -274,7 +310,6 @@ class RNIpSecVpn: RCTEventEmitter {
   ) {
     findEventsWithResolver(nil)
   }
-
 }
 
 func checkNEStatus(status: NEVPNStatus) -> NSNumber {

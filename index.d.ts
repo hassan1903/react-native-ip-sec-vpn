@@ -28,12 +28,12 @@ export declare const connect: (
   address: string,
   username: string,
   password: string,
-  vpnType?: string,
+  vpnType: string,
   enableKillSwitch?: boolean,
   mtu?: number,
 ) => Promise<void>;
-export declare const getCurrentState: () => Promise<VpnState>;
+export declare const getCurrentState: (vpnType: string) => Promise<VpnState>;
 export declare const getCharonErrorState: () => Promise<CharonErrorState>;
-export declare const disconnect: () => Promise<void>;
+export declare const disconnect: (vpnType: string) => Promise<void>;
 declare const _default: any;
 export default _default;

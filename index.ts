@@ -71,7 +71,7 @@ export const connect: (
   NativeModules.RNIpSecVpn.connect(address || "", username || "", password || "", vpnType || "", enableKillSwitch || false, mtu || 1400);
 
 // get current state
-export const getCurrentState: () => Promise<VpnState> = NativeModules.RNIpSecVpn.getCurrentState;
+export const getCurrentState: (vpnType: string) => Promise<VpnState> = (vpnType) => NativeModules.RNIpSecVpn.getCurrentState(vpnType);
 
 // get current error state from `VpnStateService`. (Android only will recieve no error on ios)
 // when [VpnState.genericError] is receivedon android, details of error can be
@@ -80,6 +80,6 @@ export const getCharonErrorState: () => Promise<CharonErrorState> = NativeModule
 
 // disconnect and stop VPN service.
 // does not raise any exception
-export const disconnect: () => Promise<void> = NativeModules.RNIpSecVpn.disconnect;
+export const disconnect: (vpnType: string) => Promise<void> = (vpnType) => NativeModules.RNIpSecVpn.disconnect(vpnType);
 
 export default NativeModules.RNIpSecVpn;
