@@ -13,7 +13,6 @@ let kSecClassValue = kSecClass as CFString
 let kSecAttrAccountValue = kSecAttrAccount as CFString
 let kSecClassGenericPasswordValue = kSecClassGenericPassword as CFString
 let kSecAttrServiceValue = kSecAttrService as CFString
-let kSecAttrGenericValue = kSecAttrGeneric as CFString
 let kSecAttrAccessibleValue = kSecAttrAccessible as CFString
 
 class KeychainService: NSObject {
@@ -25,7 +24,6 @@ class KeychainService: NSObject {
 
     let keychainQuery = NSMutableDictionary()
     keychainQuery[kSecClassValue as! NSCopying] = kSecClassGenericPasswordValue
-    keychainQuery[kSecAttrGenericValue as! NSCopying] = keyData
     keychainQuery[kSecAttrAccountValue as! NSCopying] = keyData
     keychainQuery[kSecAttrServiceValue as! NSCopying] = "VPN"
     keychainQuery[kSecAttrAccessibleValue as! NSCopying] =
@@ -41,7 +39,6 @@ class KeychainService: NSObject {
       using: String.Encoding(rawValue: String.Encoding.utf8.rawValue), allowLossyConversion: false)!
     let keychainQuery = NSMutableDictionary()
     keychainQuery[kSecClassValue as! NSCopying] = kSecClassGenericPasswordValue
-    keychainQuery[kSecAttrGenericValue as! NSCopying] = keyData
     keychainQuery[kSecAttrAccountValue as! NSCopying] = keyData
     keychainQuery[kSecAttrServiceValue as! NSCopying] = "VPN"
     keychainQuery[kSecAttrAccessibleValue as! NSCopying] =
@@ -51,7 +48,7 @@ class KeychainService: NSObject {
 
     var result: AnyObject?
     let status = withUnsafeMutablePointer(to: &result) {
-      SecItemCopyMatching(keychainQuery as CFDictionary, UnsafeMutablePointer($0))
+      SecItemCopyMatching(keychainQuery, UnsafeMutablePointer($0))
     }
 
     if status == errSecSuccess {
@@ -101,29 +98,49 @@ class RNIpSecVpn: RCTEventEmitter {
     rejecter: @escaping RCTPromiseRejectBlock
   ) {
     if vpnType.lowercased == "wireguard" {
-      let manager = NETunnelProviderManager()
-      manager.loadFromPreferences { error in
+      NETunnelProviderManager.loadAllFromPreferences { managers, error in
         if let error = error {
           rejecter("VPN_PREF_LOAD_ERR", error.localizedDescription, error)
           return
         }
+
+        let manager = managers?.first ?? NETunnelProviderManager()
+
         let proto = NETunnelProviderProtocol()
-        proto.providerBundleIdentifier = "com.example.PacketTunnel"
+        proto.providerBundleIdentifier = "com.vpnone.app.PacketTunnel"
         proto.serverAddress = address as String
-        proto.providerConfiguration = ["wgConfig": password as String, "mtu": mtu]
+
+        let rawWgConfig = password as String
+        let cleanWgConfig = rawWgConfig.replacingOccurrences(of: "\\n", with: "\n")
+        proto.providerConfiguration = ["wgQuickConfig": cleanWgConfig]
+
+        print("WG Config:\n\(cleanWgConfig)")
+        print("proto.providerConfiguration:\n\(proto.providerConfiguration ?? [:])")
 
         manager.protocolConfiguration = proto
+        manager.localizedDescription = "VPNOne WireGuard"
         manager.isEnabled = true
+
         manager.saveToPreferences { error in
           if let error = error {
-            rejecter("VPN_ERR", error.localizedDescription, error)
+            rejecter("VPN_SAVE_ERR", error.localizedDescription, error)
             return
           }
-          do {
-            try manager.connection.startVPNTunnel()
-            findEventsWithResolver(nil)
-          } catch let error {
-            rejecter("VPN_ERR", error.localizedDescription, error)
+
+          manager.loadFromPreferences { error in
+            if let error = error {
+              rejecter("VPN_RELOAD_ERR", error.localizedDescription, error)
+              return
+            }
+
+            do {
+              try manager.connection.startVPNTunnel()
+              print("✅ VPN started successfully")
+              findEventsWithResolver(nil)
+            } catch let error {
+              print("❌ startVPNTunnel() failed: \(error.localizedDescription)")
+              rejecter("VPN_START_ERR", error.localizedDescription, error)
+            }
           }
         }
       }
@@ -169,7 +186,6 @@ class RNIpSecVpn: RCTEventEmitter {
       p.username = nil
       // p.username = username as String
       p.remoteIdentifier = address as String
-      p.localIdentifier = ""
       p.serverAddress = address as String
       p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
 
@@ -242,9 +258,19 @@ class RNIpSecVpn: RCTEventEmitter {
     rejecter: @escaping RCTPromiseRejectBlock
   ) {
     if vpnType.lowercased == "wireguard" {
-      let wgManager = NETunnelProviderManager()
-      wgManager.loadFromPreferences { _ in
-        wgManager.connection.stopVPNTunnel()
+      NETunnelProviderManager.loadAllFromPreferences { managers, error in
+        guard error == nil, let manager = managers?.first else {
+          rejecter("VPN_ERR", error?.localizedDescription ?? "No VPN manager", error)
+          return
+        }
+
+        if manager.connection.status == .connected || manager.connection.status == .connecting {
+          manager.connection.stopVPNTunnel()
+          print("🔌 VPN disconnected.")
+        } else {
+          print("🔹 VPN already disconnected.")
+        }
+
         findEventsWithResolver(nil)
       }
     } else {
@@ -258,7 +284,6 @@ class RNIpSecVpn: RCTEventEmitter {
           let kcs = KeychainService()
           p.username = nil
           p.remoteIdentifier = ""
-          p.localIdentifier = ""
           p.serverAddress = ""
           p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
 
