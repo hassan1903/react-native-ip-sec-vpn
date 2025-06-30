@@ -23,6 +23,7 @@ RCT_EXTERN_METHOD(connect:(NSString *)address
                   rejecter:(RCTPromiseRejectBlock)rejecter)
 
 RCT_EXTERN_METHOD(disconnect:(NSString *)vpnType
+                  username:(NSString *)username
                   findEventsWithResolver:(RCTPromiseResolveBlock)findEventsWithResolver
                   rejecter:(RCTPromiseRejectBlock)rejecter)
 

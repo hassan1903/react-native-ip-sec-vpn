@@ -157,42 +157,43 @@ class RNIpSecVpn: RCTEventEmitter {
         return
       }
       let p = NEVPNProtocolIKEv2()
-      /* With Password Start */
-      /*
-      p.username = username as String
-      p.remoteIdentifier = address as String
-      p.serverAddress = address as String
-      p.authenticationMethod = NEVPNIKEAuthenticationMethod.none
-      p.childSecurityAssociationParameters.diffieHellmanGroup = NEVPNIKEv2DiffieHellmanGroup.group20
-      p.childSecurityAssociationParameters.lifetimeMinutes = 1440
-      p.childSecurityAssociationParameters.encryptionAlgorithm = NEVPNIKEv2EncryptionAlgorithm.algorithmAES256GCM
-      p.childSecurityAssociationParameters.integrityAlgorithm = NEVPNIKEv2IntegrityAlgorithm.SHA384
-      p.ikeSecurityAssociationParameters.diffieHellmanGroup = NEVPNIKEv2DiffieHellmanGroup.group20
-      p.ikeSecurityAssociationParameters.lifetimeMinutes = 1440
-      p.ikeSecurityAssociationParameters.encryptionAlgorithm = NEVPNIKEv2EncryptionAlgorithm.algorithmAES256GCM
-      p.ikeSecurityAssociationParameters.integrityAlgorithm = NEVPNIKEv2IntegrityAlgorithm.SHA384
-      p.enablePFS = true
-      p.enableRevocationCheck = true
-      
-      kcs.save(key: "password", value: password as String)
-      p.passwordReference = kcs.load(key: "password")
-      
-      p.useExtendedAuthentication = true
-      p.disconnectOnSleep = false
-      */
-      /* With Password End */
+      if username != "" {
+        /* With Password Start */
+        p.username = username as String
+        p.remoteIdentifier = address as String
+        p.serverAddress = address as String
+        p.authenticationMethod = NEVPNIKEAuthenticationMethod.none
+        p.childSecurityAssociationParameters.diffieHellmanGroup =
+          NEVPNIKEv2DiffieHellmanGroup.group20
+        p.childSecurityAssociationParameters.lifetimeMinutes = 1440
+        p.childSecurityAssociationParameters.encryptionAlgorithm =
+          NEVPNIKEv2EncryptionAlgorithm.algorithmAES256GCM
+        p.childSecurityAssociationParameters.integrityAlgorithm =
+          NEVPNIKEv2IntegrityAlgorithm.SHA384
+        p.ikeSecurityAssociationParameters.diffieHellmanGroup = NEVPNIKEv2DiffieHellmanGroup.group20
+        p.ikeSecurityAssociationParameters.lifetimeMinutes = 1440
+        p.ikeSecurityAssociationParameters.encryptionAlgorithm =
+          NEVPNIKEv2EncryptionAlgorithm.algorithmAES256GCM
+        p.ikeSecurityAssociationParameters.integrityAlgorithm = NEVPNIKEv2IntegrityAlgorithm.SHA384
+        p.enablePFS = true
+        p.enableRevocationCheck = true
 
-      /* Without Password Start */
-      p.username = nil
-      // p.username = username as String
-      p.remoteIdentifier = address as String
-      p.serverAddress = address as String
-      p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
+        kcs.save(key: "password", value: password as String)
+        p.passwordReference = kcs.load(key: "password")
+        /* With Password End */
+      } else {
+        /* Without Password Start */
+        p.username = nil
+        p.remoteIdentifier = address as String
+        p.serverAddress = address as String
+        p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
 
-      kcs.save(key: "sharedSecret", value: password as String)
-      p.sharedSecretReference = kcs.load(key: "sharedSecret")
-      p.passwordReference = nil
+        kcs.save(key: "sharedSecret", value: password as String)
+        p.sharedSecretReference = kcs.load(key: "sharedSecret")
+        p.passwordReference = nil
 
+        /* Without Password End */
+      }
       p.useExtendedAuthentication = false
       p.disconnectOnSleep = false
       // ✅ On-demand rules
@@ -207,7 +208,6 @@ class RNIpSecVpn: RCTEventEmitter {
       }
       vpnManager.onDemandRules = rules
       vpnManager.isOnDemandEnabled = true
-      /* Without Password End */
       vpnManager.protocolConfiguration = p
       vpnManager.isEnabled = true
       // ✅ Save and start
@@ -254,6 +254,7 @@ class RNIpSecVpn: RCTEventEmitter {
   @objc
   func disconnect(
     _ vpnType: NSString,
+    username: NSString,
     findEventsWithResolver: @escaping RCTPromiseResolveBlock,
     rejecter: @escaping RCTPromiseRejectBlock
   ) {
@@ -285,12 +286,17 @@ class RNIpSecVpn: RCTEventEmitter {
           p.username = nil
           p.remoteIdentifier = ""
           p.serverAddress = ""
-          p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
+          if username != "" {
+            p.authenticationMethod = NEVPNIKEAuthenticationMethod.none
+            kcs.save(key: "password", value: "")
+            p.passwordReference = kcs.load(key: "password")
+          } else {
+            p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
 
-          kcs.save(key: "sharedSecret", value: "")
-          p.sharedSecretReference = kcs.load(key: "sharedSecret")
-          p.passwordReference = nil
+            kcs.save(key: "sharedSecret", value: "")
+            p.sharedSecretReference = kcs.load(key: "sharedSecret")
 
+          }
           p.useExtendedAuthentication = false
           p.disconnectOnSleep = false
 
