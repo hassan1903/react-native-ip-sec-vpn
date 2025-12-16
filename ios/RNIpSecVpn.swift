@@ -107,7 +107,7 @@ class RNIpSecVpn: RCTEventEmitter {
         let manager = managers?.first ?? NETunnelProviderManager()
 
         let proto = NETunnelProviderProtocol()
-        proto.providerBundleIdentifier = "com.vpnone.app.PacketTunnel"
+        proto.providerBundleIdentifier = "com.astravpn.app.PacketTunnel"
         proto.serverAddress = address as String
 
         let rawWgConfig = password as String
@@ -118,7 +118,7 @@ class RNIpSecVpn: RCTEventEmitter {
         print("proto.providerConfiguration:\n\(proto.providerConfiguration ?? [:])")
 
         manager.protocolConfiguration = proto
-        manager.localizedDescription = "VPNOne WireGuard"
+        manager.localizedDescription = "AstraVPN WireGuard"
         manager.isEnabled = true
 
         manager.saveToPreferences { error in
@@ -162,7 +162,7 @@ class RNIpSecVpn: RCTEventEmitter {
         p.username = username as String
         p.remoteIdentifier = address as String
         p.serverAddress = address as String
-        p.authenticationMethod = NEVPNIKEAuthenticationMethod.none
+        p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
         p.childSecurityAssociationParameters.diffieHellmanGroup =
           NEVPNIKEv2DiffieHellmanGroup.group20
         p.childSecurityAssociationParameters.lifetimeMinutes = 1440
@@ -178,8 +178,10 @@ class RNIpSecVpn: RCTEventEmitter {
         p.enablePFS = true
         p.enableRevocationCheck = true
 
-        kcs.save(key: "password", value: password as String)
-        p.passwordReference = kcs.load(key: "password")
+        kcs.save(key: "vpnPassword", value: password as String)
+        p.passwordReference = kcs.load(key: "vpnPassword")
+        p.useExtendedAuthentication = true
+        p.sharedSecretReference = nil
         /* With Password End */
       } else {
         /* Without Password Start */
@@ -191,10 +193,10 @@ class RNIpSecVpn: RCTEventEmitter {
         kcs.save(key: "sharedSecret", value: password as String)
         p.sharedSecretReference = kcs.load(key: "sharedSecret")
         p.passwordReference = nil
+        p.useExtendedAuthentication = false
 
         /* Without Password End */
       }
-      p.useExtendedAuthentication = false
       p.disconnectOnSleep = false
       // ✅ On-demand rules
       var rules = [NEOnDemandRule]()
@@ -211,17 +213,16 @@ class RNIpSecVpn: RCTEventEmitter {
       vpnManager.protocolConfiguration = p
       vpnManager.isEnabled = true
       // ✅ Save and start
-      let defaultErr = NSError()
 
-      vpnManager.saveToPreferences(completionHandler: { (error) -> Void in
+      vpnManager.saveToPreferences(completionHandler: { (saveError) -> Void in
         if error != nil {
-          print("VPN Preferences error: 2")
+          print("VPN Preferences save error", saveError as Any)
         } else {
-          vpnManager.loadFromPreferences(completionHandler: { error in
+          vpnManager.loadFromPreferences(completionHandler: { loadError in
 
             if error != nil {
-              print("VPN Preferences error: 2")
-              rejecter("VPN_ERR", "VPN Preferences error: 2", defaultErr)
+              print("VPN Preferences load error:")
+              rejecter("VPN_ERR", "VPN Preferences load error:", loadError)
             } else {
               var startError: NSError?
 
@@ -287,17 +288,18 @@ class RNIpSecVpn: RCTEventEmitter {
           p.remoteIdentifier = ""
           p.serverAddress = ""
           if username != "" {
-            p.authenticationMethod = NEVPNIKEAuthenticationMethod.none
-            kcs.save(key: "password", value: "")
-            p.passwordReference = kcs.load(key: "password")
+            p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
+            kcs.save(key: "vpnPassword", value: "")
+            p.passwordReference = kcs.load(key: "vpnPassword")
+            p.useExtendedAuthentication = true
           } else {
             p.authenticationMethod = NEVPNIKEAuthenticationMethod.sharedSecret
 
             kcs.save(key: "sharedSecret", value: "")
             p.sharedSecretReference = kcs.load(key: "sharedSecret")
+            p.useExtendedAuthentication = false
 
           }
-          p.useExtendedAuthentication = false
           p.disconnectOnSleep = false
 
           vpnManager.onDemandRules = []
