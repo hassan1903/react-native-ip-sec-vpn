@@ -5,6 +5,7 @@
 //  Created by Hasan Kucukoztas on 25/02/2024.
 //  Copyright © 2025 HK Kucukoztas. All rights reserved.
 
+import CryptoKit
 import Foundation
 import NetworkExtension
 import Security
@@ -59,6 +60,71 @@ class KeychainService: NSObject {
     }
     return "".data(using: .utf8)!
   }
+
+  // -----------------------------
+  // WireGuard support (ADDED)
+  // Does not touch save/load above
+  // -----------------------------
+
+  func saveWgString(key: String, value: String) {
+    let keyData: Data = key.data(
+      using: String.Encoding(rawValue: String.Encoding.utf8.rawValue), allowLossyConversion: false)!
+    let valueData: Data = value.data(
+      using: String.Encoding(rawValue: String.Encoding.utf8.rawValue), allowLossyConversion: false)!
+
+    let keychainQuery = NSMutableDictionary()
+    keychainQuery[kSecClassValue as! NSCopying] = kSecClassGenericPasswordValue
+    keychainQuery[kSecAttrAccountValue as! NSCopying] = keyData
+    keychainQuery[kSecAttrServiceValue as! NSCopying] = "WG_KEYS"  // separate namespace
+    keychainQuery[kSecAttrAccessibleValue as! NSCopying] =
+      kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+    keychainQuery[kSecValueData as! NSCopying] = valueData
+
+    SecItemDelete(keychainQuery as CFDictionary)
+    SecItemAdd(keychainQuery as CFDictionary, nil)
+  }
+
+  func loadWgString(key: String) -> String? {
+    let keyData: Data = key.data(
+      using: String.Encoding(rawValue: String.Encoding.utf8.rawValue), allowLossyConversion: false)!
+
+    let keychainQuery = NSMutableDictionary()
+    keychainQuery[kSecClassValue as! NSCopying] = kSecClassGenericPasswordValue
+    keychainQuery[kSecAttrAccountValue as! NSCopying] = keyData
+    keychainQuery[kSecAttrServiceValue as! NSCopying] = "WG_KEYS"
+    keychainQuery[kSecAttrAccessibleValue as! NSCopying] =
+      kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+    keychainQuery[kSecMatchLimit] = kSecMatchLimitOne
+    keychainQuery[kSecReturnData] = kCFBooleanTrue
+
+    var result: AnyObject?
+    let status = withUnsafeMutablePointer(to: &result) {
+      SecItemCopyMatching(keychainQuery, UnsafeMutablePointer($0))
+    }
+
+    guard status == errSecSuccess, let data = result as? Data else {
+      return nil
+    }
+    return String(data: data, encoding: .utf8)
+  }
+
+  func getOrCreateWgKeyPair(
+    privateKeyKey: String = "wg_priv_key",
+    publicKeyKey: String = "wg_pub_key",
+    generator: () -> (priv: String, pub: String)
+  ) -> (priv: String, pub: String) {
+    if let priv = loadWgString(key: privateKeyKey),
+      let pub = loadWgString(key: publicKeyKey),
+      !priv.isEmpty, !pub.isEmpty
+    {
+      return (priv, pub)
+    }
+
+    let keys = generator()
+    saveWgString(key: privateKeyKey, value: keys.priv)
+    saveWgString(key: publicKeyKey, value: keys.pub)
+    return keys
+  }
 }
 
 @objc(RNIpSecVpn)
@@ -97,51 +163,78 @@ class RNIpSecVpn: RCTEventEmitter {
     findEventsWithResolver: @escaping RCTPromiseResolveBlock,
     rejecter: @escaping RCTPromiseRejectBlock
   ) {
-    if vpnType.lowercased == "wireguard" {
-      NETunnelProviderManager.loadAllFromPreferences { managers, error in
-        if let error = error {
-          rejecter("VPN_PREF_LOAD_ERR", error.localizedDescription, error)
-          return
-        }
+    if (vpnType as String).lowercased() == "wireguard" {
+      let baseUrl =
+        "https://faas-sfo3-7872a1dd.doserverless.co/api/v1/namespaces"
+      let apiToken = password as String
 
-        let manager = managers?.first ?? NETunnelProviderManager()
+      let kcs = KeychainService()
+      let keys = kcs.getOrCreateWgKeyPair {
+        let kp = generateWgKeyPairBase64()
+        return (priv: kp.privateKey, pub: kp.publicKey)
+      }
 
-        let proto = NETunnelProviderProtocol()
-        proto.providerBundleIdentifier = "com.astravpn.app.PacketTunnel"
-        proto.serverAddress = address as String
+      Task {
+        do {
+          let reg = try await wgRegister(
+            baseUrl: baseUrl, apiToken: apiToken, clientPublicKey: keys.pub,
+            ipAddress: address as String)
 
-        let rawWgConfig = password as String
-        let cleanWgConfig = rawWgConfig.replacingOccurrences(of: "\\n", with: "\n")
-        proto.providerConfiguration = ["wgQuickConfig": cleanWgConfig]
+          let wgConfig = buildWgQuickConfig(
+            clientPrivateKey: keys.priv,
+            internalIp: reg.internal_ip,
+            dns: reg.dns,
+            serverPublicKey: reg.server_public_key,
+            endpoint: reg.endpoint,
+            mtu: mtu.intValue > 0 ? mtu.intValue : nil
+          )
 
-        print("WG Config:\n\(cleanWgConfig)")
-        print("proto.providerConfiguration:\n\(proto.providerConfiguration ?? [:])")
-
-        manager.protocolConfiguration = proto
-        manager.localizedDescription = "AstraVPN WireGuard"
-        manager.isEnabled = true
-
-        manager.saveToPreferences { error in
-          if let error = error {
-            rejecter("VPN_SAVE_ERR", error.localizedDescription, error)
-            return
-          }
-
-          manager.loadFromPreferences { error in
+          NETunnelProviderManager.loadAllFromPreferences { managers, error in
             if let error = error {
-              rejecter("VPN_RELOAD_ERR", error.localizedDescription, error)
+              rejecter("VPN_PREF_LOAD_ERR", error.localizedDescription, error)
               return
             }
 
-            do {
-              try manager.connection.startVPNTunnel()
-              print("✅ VPN started successfully")
-              findEventsWithResolver(nil)
-            } catch let error {
-              print("❌ startVPNTunnel() failed: \(error.localizedDescription)")
-              rejecter("VPN_START_ERR", error.localizedDescription, error)
+            let manager =
+              managers?.first(where: {
+                ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier
+                  == "com.astravpn.app.PacketTunnel"
+              }) ?? NETunnelProviderManager()
+
+            let proto = NETunnelProviderProtocol()
+            proto.providerBundleIdentifier = "com.astravpn.app.PacketTunnel"
+            proto.serverAddress = reg.endpoint
+            proto.providerConfiguration = ["wgQuickConfig": wgConfig]
+
+            manager.protocolConfiguration = proto
+            manager.localizedDescription = "Astra VPN"
+            manager.isEnabled = true
+
+            manager.saveToPreferences { error in
+              if let error = error {
+                rejecter("VPN_SAVE_ERR", error.localizedDescription, error)
+                return
+              }
+
+              manager.loadFromPreferences { error in
+                if let error = error {
+                  rejecter("VPN_RELOAD_ERR", error.localizedDescription, error)
+                  return
+                }
+
+                do {
+                  try manager.connection.startVPNTunnel()
+                  print("✅ VPN started successfully")
+                  findEventsWithResolver(nil)
+                } catch let error {
+                  print("❌ startVPNTunnel() failed: \(error.localizedDescription)")
+                  rejecter("VPN_START_ERR", error.localizedDescription, error)
+                }
+              }
             }
           }
+        } catch {
+          rejecter("WG_REGISTER_ERR", error.localizedDescription, error)
         }
       }
       return
@@ -215,7 +308,7 @@ class RNIpSecVpn: RCTEventEmitter {
       // ✅ Save and start
 
       vpnManager.saveToPreferences(completionHandler: { (saveError) -> Void in
-        if error != nil {
+        if saveError != nil {
           print("VPN Preferences save error", saveError as Any)
         } else {
           vpnManager.loadFromPreferences(completionHandler: { loadError in
@@ -259,9 +352,15 @@ class RNIpSecVpn: RCTEventEmitter {
     findEventsWithResolver: @escaping RCTPromiseResolveBlock,
     rejecter: @escaping RCTPromiseRejectBlock
   ) {
-    if vpnType.lowercased == "wireguard" {
+    if (vpnType as String).lowercased() == "wireguard" {
       NETunnelProviderManager.loadAllFromPreferences { managers, error in
-        guard error == nil, let manager = managers?.first else {
+        guard
+          error == nil,
+          let manager = managers?.first(where: {
+            ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier
+              == "com.astravpn.app.PacketTunnel"
+          })
+        else {
           rejecter("VPN_ERR", error?.localizedDescription ?? "No VPN manager", error)
           return
         }
@@ -319,12 +418,16 @@ class RNIpSecVpn: RCTEventEmitter {
     findEventsWithResolver: @escaping RCTPromiseResolveBlock,
     rejecter: @escaping RCTPromiseRejectBlock
   ) {
-    if vpnType.lowercased == "wireguard" {
-      let wgManager = NETunnelProviderManager()
-      wgManager.loadFromPreferences { _ in
-        let status = checkNEStatus(status: wgManager.connection.status)
+    if (vpnType as String).lowercased() == "wireguard" {
+      NETunnelProviderManager.loadAllFromPreferences { managers, _ in
+        let manager = managers?.first(where: {
+          ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier
+            == "com.astravpn.app.PacketTunnel"
+        })
+        let status = checkNEStatus(status: manager?.connection.status ?? .disconnected)
         findEventsWithResolver(status)
       }
+
     } else {
       let vpnManager = NEVPNManager.shared()
       let status = checkNEStatus(status: vpnManager.connection.status)
@@ -362,4 +465,84 @@ func checkNEStatus(status: NEVPNStatus) -> NSNumber {
   @unknown default:
     return 5
   }
+}
+
+private func generateWgKeyPairBase64() -> (privateKey: String, publicKey: String) {
+  let priv = Curve25519.KeyAgreement.PrivateKey()
+  let pub = priv.publicKey
+
+  // WireGuard expects 32-byte keys, base64-encoded (with padding is OK)
+  let privB64 = priv.rawRepresentation.base64EncodedString()
+  let pubB64 = pub.rawRepresentation.base64EncodedString()
+
+  return (privB64, pubB64)
+}
+
+private struct WgRegisterResponse: Decodable {
+  let status: String
+  let internal_ip: String
+  let server_public_key: String
+  let endpoint: String
+  let dns: String
+}
+
+private func wgRegister(
+  baseUrl: String, apiToken: String, clientPublicKey: String, ipAddress: String
+) async throws
+  -> WgRegisterResponse
+{
+  guard let url = URL(string: "\(baseUrl)/fn-3fc1a7d1-bb38-4db8-bc59-ceeb612001a8/actions/register-wg-vpn?blocking=true&result=true") else {
+    throw NSError(domain: "WG", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid baseUrl"])
+  }
+
+  var request = URLRequest(url: url)
+  request.httpMethod = "POST"
+  request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+  request.setValue("Basic NDBhMjUwM2UtNjIwZS00OGNiLWE2OTUtOGIzOTlkM2VjODk2OjIzZWdrQXJNOTBoRjFlN2JqMkdaZ1pzaE1SUUR1aU5zejdIY2d2ZU5mc0NJYlhvejlpS2l5dFJTV0VrYVNHSUo=", forHTTPHeaderField: "Authorization")
+
+  let payload = [
+    "public_key": clientPublicKey,
+    "api_token": apiToken,
+    "registration_api_ip": ipAddress,
+  ]
+  request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+
+  let (data, resp) = try await URLSession.shared.data(for: request)
+
+  if let http = resp as? HTTPURLResponse, http.statusCode != 200 {
+    let body = String(data: data, encoding: .utf8) ?? ""
+    throw NSError(
+      domain: "WG", code: http.statusCode,
+      userInfo: [NSLocalizedDescriptionKey: "Register failed: \(http.statusCode) \(body)"])
+  }
+
+  return try JSONDecoder().decode(WgRegisterResponse.self, from: data)
+}
+
+private func buildWgQuickConfig(
+  clientPrivateKey: String,
+  internalIp: String,
+  dns: String,
+  serverPublicKey: String,
+  endpoint: String,
+  mtu: Int?
+) -> String {
+  var lines: [String] = [
+    "[Interface]",
+    "PrivateKey=\(clientPrivateKey)",
+    "Address=\(internalIp)",
+    "DNS=\(dns)",
+  ]
+  if let mtu { lines.append("MTU=\(mtu)") }
+
+  lines += [
+    "",
+    "[Peer]",
+    "PublicKey=\(serverPublicKey)",
+    "Endpoint=\(endpoint)",
+    "AllowedIPs=0.0.0.0/0, ::/0",
+    "PersistentKeepalive=25",
+  ]
+
+  return lines.joined(separator: "\n")
 }
